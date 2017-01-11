@@ -1,0 +1,10 @@
+model {
+  for (i in 1:N) {
+    growth[i] ~ dnorm(mu[i],tau)
+    mu[i] <- a+b*tannin[i]
+  }
+  a ~ dnorm(0,1E-4)
+  b ~ dnorm(0,1E-4)
+  sigma <- 1/sqrt(tau)
+  tau ~ dgamma(1E-3,1E-3)
+}
