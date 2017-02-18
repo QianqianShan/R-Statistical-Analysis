@@ -563,9 +563,9 @@ for(i in 2:9)
 ##
 text(1, 10,  "Derivatives:", adj = 0)
 text(1, 9.6, expression(
-  "             first: {f * minute}(x) " == {f * minute}(x)), adj = 0)
+          "first: {f * minute}(x) " == {f * minute}(x)), adj = 0)
 text(1, 9.0, expression(
-  "     second: {f * second}(x) "        == {f * second}(x)), adj = 0)
+          "second: {f * second}(x) "== {f * second}(x)), adj = 0)
 
 
 plot(1:10, 1:10)
@@ -604,3 +604,604 @@ text(3, 10, expression(symbol("\341")))
 text(1, 11, "rightangle", adj = 0); text(2.5, 11,  "\\361")
 text(3, 11, expression(symbol("\361")))
 
+
+## 29.9 Phase Planes
+
+plot(c(0,1),c(0,1),ylab="",xlab="",xaxt='n',yaxt='n',type='n')
+# xaxt, yaxt supress the tick marks 
+?abline # abline(a,b,h,v) a,b are intercept and slope repectively
+abline(0.8,-1.5,col="blue")
+abline(0.6,-0.8, col="red")
+axis(1, at = 0.805, lab = expression(1/alpha[21]))
+axis(1, at = 0.56, lab = expression(1/alpha[11]))
+axis(2, at = 0.86, lab = expression(1/alpha[12]),las=1)
+axis(2, at = 0.63, lab = expression(1/alpha[22]),las=1)
+
+text(0.05,0.85, expression(paste(frac("d N"[1],"dt"), " = 0" )))
+text(0.78,0.07, expression(paste(frac("d N"[2],"dt"), " = 0" )))
+?arrows
+arrows(-0.02,0.72,0.05,0.72,length=0.1)
+arrows(-0.02,0.72,-0.02,0.65,length=0.1)
+arrows(-0.02,0.72,0.05,0.65,length=0.1)
+arrows(0.65,-0.02,0.65,0.05,length=0.1)
+arrows(0.65,-0.02,0.58,-0.02,length=0.1)
+arrows(0.65,-0.02,0.58,0.05,length=0.1)
+arrows(0.15,0.25,0.15,0.32,length=0.1)
+arrows(0.15,0.25,0.22,0.25,length=0.1)
+arrows(0.15,0.25,0.22,0.32,length=0.1)
+arrows(.42,.53,.42,.46,length=0.1)
+arrows(.42,.53,.35,.53,length=0.1)
+arrows(.42,.53,.35,.46,length=0.1)
+axis(1, at = 1, lab = expression(N[1]))
+axis(2, at = 1, lab = expression(N[2]),las=1)
+
+
+
+## 29.10 Fat Arrows 
+# Defined a function called fat.arrow to add arrows to plots
+fat.arrow <- function(size.x=0.5,size.y=0.5,ar.col="red"){ 
+size.x <- size.x*(par("usr")[2]-par("usr")[1])*0.1
+size.y <- size.y*(par("usr")[4]-par("usr")[3])*0.1
+pos <- locator(1)
+xc <- c(0,1,0.5,0.5,-0.5,-0.5,-1,0)
+yc <- c(0,1,1,6,6,1,1,0) 
+polygon(pos$x+size.x*xc,pos$y+size.y*yc,col=ar.col) 
+}
+?polygon
+# usr: A vector of the form c(x1, x2, y1, y2) giving the extremes of the user coordinates
+# of the plotting region.
+
+# Example of the use of fat.arrow 
+plot(0:10,0:10,type="n",xlab="",ylab="")
+fat.arrow()
+fat.arrow(ar.col="green")
+fat.arrow(ar.col="blue",size.x=0.8)
+fat.arrow(ar.col="orange",size.x=0.8,size.y=0.3)
+fat.arrow(ar.col="gray",size.x=0.2,size.y=0.3)
+
+## 29.11 three dimensional plots with "akima" package 
+data<-read.table('pgr.txt',header=T)
+attach(data)
+names(data)
+# install.packages('akima')
+library(akima)
+zz<-interp(hay,pH,FR)
+# now zz can be used in any of contour, filled.contour, image or persp
+image(zz,col=topo.colors(12),xlab='biomass',ylab='pH')
+contour(zz,add=T)
+contour(zz)
+
+filled.contour(zz,col=topo.colors(25),xlab='biomass',ylab='pH')
+# I like this more as it has a clear color key for reference. 
+
+?persp #This function draws perspective plots of a surface over the x–y plane. 
+       # persp is a generic function.
+       # Allows angled view of a 3D-like object
+
+persp(zz,xlab='biomass',ylab='pH',zlab='Festuca Rubra',
+      theta=45, phi=30,col='green')
+detach(data)
+x<-seq(0,10,0.1)
+y<-seq(0,10,0.1)
+func <-  function(x,y) 3 * x * exp(0.1*x) * sin(y*exp(-0.5*x))
+func
+image(x,y,outer(x,y,func))
+contour(x,y,outer(x,y,func),add=T)
+?outer # returns values(outer product) of func(x,y) 
+
+## 29.12 Complex 3D plots with wireframe in package lattice 
+library(lattice)
+wireframe(volcano, shade =TRUE, aspect = c(61/87,0.4), screen = list(z = -120, x = -45),
+          light.source = c(0,0, 10), distance = 0.2,
+          shade.colors = function(irr, ref,height, w = 0.5) 
+            grey(w * irr + (1 - w) * (1 - (1 - ref)^0.4))
+          )
+
+wireframe(volcano, shade = TRUE,
+          aspect = c(61/87, 0.4),
+          light.source = c(10,0,10))
+?wireframe
+
+summary(volcano)
+
+
+n <- 50
+tx <- matrix(seq(-pi, pi, len = 2 * n), 2 * n, n)
+ty <- matrix(seq(-pi, pi, len = n)/2, 2 * n, n, byrow = T)
+xx <- cos(tx) * cos(ty)
+yy <- sin(tx) * cos(ty)
+zz <- sin(ty)
+zzz <- zz
+zzz[, 1:12 * 4] <- NA
+wireframe(zzz ~ xx * yy, shade = TRUE, light.source = c(3,3,3))
+
+
+# 29.13 Alphabetical tour of the graphics parameters 
+
+# usr the limits of the current axes 
+??usr
+#A vector of the form c(x1, x2, y1, y2) giving the extremes of the user 
+#coordinates of the plotting region. 
+par('usr')
+
+par('mar') # give the number of lines of the margin 
+
+par(adj=0.5)
+# adj=0 for left justified text, 0.5 for center text (default), 1 for right justified.
+
+# ask=TRUE , logical. If TRUE (and the R session is interactive) the user is asked for input, 
+# before a new figure is drawn
+
+
+# bty: box type 
+
+?par  # use par to check all the other options 
+
+
+# 29.13.4 Control over the axes by axis 
+
+plot(1:10,10:1,type='n',axes=FALSE,xlab='',ylab='') # No axes 
+axis(1,1:10,LETTERS[1:10],col.axis='blue')
+axis(2,1:10,letters[10:1],col.axis='red')
+axis(3,lwd=3,col.axis='green')
+axis(4,at=c(2,5,8),labels=c('one','two','three'))
+box()  # if box() is not used, there will be gaps between the ends of each axis 
+
+
+#29.13.5 Background color 
+par(bg='cornsilk')
+plot(1:10,10:1,type='n',axes=FALSE,xlab='',ylab='') # No axes 
+axis(1,1:10,LETTERS[1:10],col.axis='blue')
+axis(2,1:10,letters[10:1],col.axis='red')
+axis(3,lwd=3,col.axis='green')
+axis(4,at=c(2,5,8),labels=c('one','two','three'))
+box()  # if box() is not used, there will be gaps between the ends of each axis 
+
+
+# default 
+par(bg='transparent')
+
+
+# 29.13.6 Boxs around plots, bty 
+
+par(mfrow=c(2,3))
+plot(1:10,10:1,type='n',main='default complete box')
+plot(1:10,10:1,type='n',bty='n',main='no box')
+plot(1:10,10:1,type='n',bty='l',main='open on the left')
+plot(1:10,10:1,type='n',bty='c',main='open on the right')
+plot(1:10,10:1,type='n',bty='u',main='open on the top')
+plot(1:10,10:1,type='n',bty='7',main='top and right only')
+
+
+
+# 29.13.7 Size of plotting symbols using the character expansion function, cex 
+par(mfrow=c(1,1))
+plot(0:10,0:10,type='n',xlab='',yalb='')
+for (i in 1:10) points(2,i,cex=i)
+for(i in 1:10) points(6,i,cex=10+2*i)
+
+# 29.13.8 Changing of the shape of the plotting region, plt 
+# coordinates of the plot region as fractions of the current figure region
+default_plt<-par('plt')
+par(plt=c(0.15,0.94,0.3,0.7))
+plot(c(0,3000),c(0,1500),type='n')
+par(plt=default_plt)
+
+
+# 29.13.9 Locating multiple graphs in non standard layout by fig 
+
+# fig : coordinates of the figure region 
+
+default_fig<-par('fig')
+
+par(fig=c(0.5,1,0.5,1))
+plot(0:10,25*exp(-0.1*0:10),col='blue',type='l')
+par(fig=c(0,0.5,0,0.5))
+plot(0:10,25*exp(-0.1*0:10),col='blue',type='l')
+
+
+# 29.13.10 Two graphs with a common x scale but different y scales using fig 
+
+data<-read.table('gales.txt',header=T)
+attach(data)
+names(data)
+
+
+par(fig=c(0,1,0.5,1))
+default_mar<-par('mar')
+
+par(mar=c(0,5,2,2)) # set bottom margin to zero so the plot on top sit right on top of lower graph
+plot(year,number,xlab='',xaxt='n',type='b',pch=16,col='blue') 
+# xaxt set up axis but not plot 
+par(fig=c(0,1,0,0.5),new=T) # figure for the bottom plot 
+par(mar=c(2,5,0,2))
+plot(year, February,xlab='Year',type='h',col='red') # h for histogram like vertical lines
+
+
+# reset fig and mar 
+par(mar=default_mar)
+par(fig=default_fig)
+
+
+# 29.13.11 The layout function 
+# Another way to configure both location and shape of multip plotting regions independently
+
+?pmin # Returns the (parallel) maxima and minima of the input values.
+x<-pmin(3,pmax(-3,rnorm(50)))
+x
+# First compare -3 with 50 random variables and return the max one , then compare with 3 and 
+# return the min one 
+
+y<-pmin(3,pmax(-3,rnorm(50)))
+xhist<-hist(x,breaks=c(-3,3,0.5),plot=FALSE)
+yhist<-hist(y,breaks=c(-3,3,0.5),plot=FALSE)
+
+top<-max(c(xhist$counts,yhist$counts))
+xrange<-c(-3,3)
+yrange<-c(-3,3)
+
+matrix(c(2,0,1,3),2,2,byrow=TRUE)
+
+nf<-layout(matrix(c(2,0,1,3),2,2,byrow=TRUE),c(3,1),c(1,3),TRUE) #2,0,1,3 is the corresponding figure name
+layout.show(nf)
+
+# layout(matrix,widths,heights,respect=TRUE)
+# matrix specifies the location of the next n figures, left to right, top to bottom 
+
+
+par(mar=c(3,3,1,1))
+plot(x,y,xlim=xrange,ylim=yrange,pch=21,col='blue',bg='red')
+par(mar=c(0,3,1,1))
+barplot(xhist$counts,axes=FALSE,col='green',ylim=c(0,top),space=0,bin=5)
+# space : the space between bars 
+
+par(mar=c(3,0,1,1))
+barplot(yhist$counts,axes=FALSE,col='green',xlim=c(0,top),space=0,horiz=TRUE)
+
+
+# 29.13.12 Create and control multiple screens on a single device by split.screen
+# Should complete each graph before moving on to the next screen 
+# erase.screen is used clear plots 
+# close.screen removes the specified screen 
+# close.screen(all=TRUE) exit split screen 
+default_mar<-c(5.1,4.1,4.1,2.1)
+par(mar=default_mar)
+par(fig=default_fig)
+fig.mat<-c(0,0,0.5,0.5,1,0.5,1,1,0.7,0,0.35,0,1,0.7,0.7,0.35)
+fig.mat<-matrix(fig.mat,nrow=4)
+fig.mat
+
+dev.off()
+
+split.screen(fig.mat)
+par(mar=c(2,5,1,2))
+screen(1)
+plot(year,number,type='l',col='blue')
+screen(2)
+par(mar=c(4,5,0,1))
+plot(year,February,type='h',col='red')
+par(mar=c(4,5,0,1))
+screen(3)
+plot(1:10,0.5*(1:10)^0.5,xlab='Concentration',ylab='rate',type='l',col='green4')
+par(mar=c(4,5,0,1))
+screen(4)
+plot(1:10,600*exp(-0.5*(1:10)),xlab='Time',ylab='residue',type='l',col='green4')
+close.screen(all=TRUE)
+
+
+detach(data)
+
+
+# 29.13.14 Shapes for the ends and joins of lines, lend and join 
+plot(0:10,0:10,type='n',xlab='',ylab='')
+lines(c(2,5,8),c(8,2,8),lwd=50,lend='square',ljoin='mitre')
+lines(c(2,5,8),c(8,2,8),lwd=50,ljoin='round',lend='round',col='green')
+lines(c(2,5,8),c(8,2,8),lwd=50,lend='butt',ljoin='bevel',col='red')
+
+# a random walk 
+x<-numeric(100)
+y<-numeric(100)
+x[1]<-1
+y[1]<-1
+for (i in 2:100){
+  a<-runif(1)*2*pi
+  d<-runif(1)*2*pi
+  x[i]<-x[i-1]+d*sin(a)
+  y[i]<-y[i-1]+d*cos(a)
+}
+
+# To show the road map of a random walk, first draw lines with a bigger width 
+# then draw same thing with smaller width 
+plot(c(min(x),max(x)),c(min(y),max(y)),type='n',xaxt='n',yaxt='n',xlab='',ylab='')
+lines(x,y,lwd=13,lend='round',ljoin='round')
+lines(x,y,lwd=10,lend='round',ljoin='round',col='red')
+
+
+# line type 1...6 
+
+
+# 29.13.20  Two graphs on the same plot with different scales in y, new=T 
+gales<-read.table('gales.txt',header=T)
+attach(gales)
+default_mar<-par('mar')
+par(mar=c(5,4,4,4)+0.1)
+plot(year,number,type='l',lwd=2,las=1,col='blue')
+par(new=T)
+plot(year,February,type='h',axes=F,ylab='',lty=2,col='red')
+axis(4,las=1)
+mtext(side=4,line=2.5,'Feb Gales')
+detach(gales)
+
+par(mar=default_mar)
+par(new=FALSE)
+
+# 29.13.21 Out margin, oma 
+# Useful when extra space needed for labels/titles 
+
+default_outer<-par('oma')
+
+attach(anscombe)
+par(mfrow=c(2,2),oma=c(0,0,2,0))
+plot(x1,y1,main='set 1',col='red',pch=21,bg='orange',xlim=c(0,20),ylim=c(0,16))
+abline(lm(y1~x1),col='navy')
+plot(x2,y2,main='set 2',col='red',pch=21,bg='orange',xlim=c(0,20),ylim=c(0,16))
+abline(lm(y2~x2),col='navy')
+plot(x3,y3,main='set 3',col='red',pch=21,bg='orange',xlim=c(0,20),ylim=c(0,16))
+abline(lm(y3~x3),col='navy')
+plot(x4,y4,main='set 2',col='red',pch=21,bg='orange',xlim=c(0,20),ylim=c(0,16))
+abline(lm(y4~x4),col='navy')
+mtext('Anscombe regression',outer=T,cex=1.5) # outer=T allows writing title in outer margin
+detach(anscombe)
+
+
+# 29.13.22 Packing graphs closer together 
+par(mfrow=c(3,3))
+par(mar=c(0.2,0.2,0.2,0.2))
+par(oma=c(5,5,0,0))
+for (i in 1:9) plot(sort(runif(100)),sort(runif(100)),
+                    xaxt='n',yaxt='n',pch=21,bg='green')
+title(xlab='time',ylab='distance',outer=T,cex.lab=2)
+
+dev.off()
+
+
+# 29.13.24 Character rotation, srt (string rotation)
+
+plot(1:10,1:10,type='n',xlab='',ylab='')
+for (i in 1:10) text(i,i,LETTERS[i],srt=(20*i),col='red')
+for (i in 1:10) text(10-i+1,i,letters[i],srt=(20*i),col='blue')
+
+
+# 29.13.25 Rotating the axis labels 
+spending<-read.table('spending.txt',header=T)
+spending
+attach(spending)
+par(mar=c(7,4,4,2)+0.1)
+xvals<-barplot(spend,ylab='Spending',col='wheat2')
+text(xvals,par('usr')[3]-0.25,srt=45,adj=1,labels=country,xpd=T)
+# adj=1 for right justified
+??xpd
+#  xpd, If FALSE, all plotting is clipped to the plot region, 
+# if TRUE, all plotting is clipped to the figure region, 
+# and if NA, all plotting is clipped to the device region.
+dev.off()
+# 29.13.26 Tick marks on the axes 
+par(mfrow=c(2,2))
+plot(1:10,1:10,xlab='',ylab='',type='n',main='default ticks')
+plot(1:10,1:10,xlab='',ylab='',type='n',main='maximum ticks',tck=1)
+plot(1:10,1:10,xlab='',ylab='',type='n',main='no ticks',tck=0)
+plot(1:10,1:10,xlab='',ylab='',type='n',main='interior ticks',tck=0.05)
+??tck
+# tck, The length of tick marks as a fraction of the smaller of the width or
+# height of the plotting region. If tck >= 0.5 it is interpreted as a fraction
+# of the relevant side, so if tck = 1 grid lines are drawn. 
+# The default setting (tck = NA) is to use tcl = -0.5.
+# tcl length of the tick 
+
+dev.off()
+plot(1:10,1:10,xlab='',ylab='',main='default ticks',xaxs='i')
+# xaxs = r, i
+
+
+# 29.14 Trellis graphics
+# Mainly used to produce multiple plots per page and multi-page plots, particularly in the 
+# context of mixed effects modelling. 
+
+data<-read.table('panels.txt',header=T)
+data
+attach(data)
+library(lattice)
+xyplot(weight~age|gender)
+# xyplot produces bivariate scatterplots or time-series plots, 
+# bwplot produces box-and-whisker plots, 
+# dotplot produces Cleveland dot plots,
+# barchart produces bar plots, 
+# and stripplot produces one-dimensional scatterplots
+detach(data)
+
+# Change par() settings has NO effect on lattice plots. 
+
+# From xyplot help files
+require(stats)
+
+## Tonga Trench Earthquakes
+
+Depth <- equal.count(quakes$depth, number=8, overlap=.1)
+xyplot(lat ~ long | Depth, data = quakes)
+update(trellis.last.object(),
+       strip = strip.custom(strip.names = TRUE, strip.levels = TRUE),
+       par.strip.text = list(cex = 0.75),
+       aspect = "iso")
+
+## Examples with data from `Visualizing Data' (Cleveland, 1993) obtained
+## from http://cm.bell-labs.com/cm/ms/departments/sia/wsc/
+
+EE <- equal.count(ethanol$E, number=9, overlap=1/4)
+
+## Constructing panel functions on the fly; prepanel
+xyplot(NOx ~ C | EE, data = ethanol,
+       prepanel = function(x, y) prepanel.loess(x, y, span = 1),
+       xlab = "Compression Ratio", ylab = "NOx (micrograms/J)",
+       panel = function(x, y) {
+         panel.grid(h = -1, v = 2) #horizontal and vertical space 
+         panel.xyplot(x, y)
+         panel.loess(x, y, span=1)
+       },
+       aspect = "xy")
+# loess add a smooth line based on data 
+
+
+## Extended formula interface 
+
+xyplot(Sepal.Length + Sepal.Width ~ Petal.Length + Petal.Width | Species,
+       data = iris, scales = "free", layout = c(2, 2),
+       auto.key = list(x = .6, y = .7, corner = c(0, 0)))
+
+
+## user defined panel functions
+
+states <- data.frame(state.x77,
+                     state.name = dimnames(state.x77)[[1]],
+                     state.region = state.region)
+xyplot(Murder ~ Population | state.region, data = states,
+       groups = state.name,
+       panel = function(x, y, subscripts, groups) {
+         ltext(x = x, y = y, labels = groups[subscripts], cex=1,
+               fontfamily = "HersheySans")
+       })
+
+
+
+## Grouped dot plot showing anomaly at Morris
+
+dotplot(variety ~ yield | site, data = barley, groups = year,
+        key = simpleKey(levels(barley$year), space = "right"),
+        xlab = "Barley Yield (bushels/acre) ",
+        aspect=0.5, layout = c(1,6), ylab=NULL)
+
+stripplot(voice.part ~ jitter(height), data = singer, aspect = 1,
+          jitter.data = TRUE, xlab = "Height (inches)")
+
+## Interaction Plot
+
+xyplot(decrease ~ treatment, OrchardSprays, groups = rowpos,
+       type = "a",
+       auto.key =
+         list(space = "right", points = FALSE, lines = TRUE))
+
+## longer version with no x-ticks
+
+bwplot(decrease ~ treatment, OrchardSprays, groups = rowpos,
+       panel = "panel.superpose",
+       panel.groups = "panel.linejoin",
+       xlab = "treatment",
+       key = list(lines = Rows(trellis.par.get("superpose.line"),
+                               c(1:7, 1)),
+                  text = list(lab = as.character(unique(OrchardSprays$rowpos))),
+                  columns = 4, title = "Row position"))
+
+# 29.14.1 Panel box-and-whisker plots 
+data<-read.table('daphnia.txt',header=T)
+attach(data)
+names(data)
+bwplot(Growth.rate~Water+Daphnia|Detergent)
+detach(data)
+# 29.14.2 Panel scatterplot
+results<-read.table('fertilizer.txt',header=T)
+attach(results)
+names(results)
+xyplot(root~week|plant)
+# the panels are shown in alphabetical order by plant name 
+
+xyplot(root~week|plant, pch=16)
+
+
+# If we want to fit a separate linear regression for each individual plant, need to use 'panel'
+
+xyplot(root~week|plant,
+       panel=function(x,y){
+         panel.xyplot(x,y,pch=16)
+         panel.abline(lm(y~x))
+       })
+
+# If we want to do different things in different panels 
+
+# example, draw a highlighted line at the location of the fourth data point in each panel
+xyplot(root~week|plant,
+       panel=function(x,y){
+         panel.xyplot(x,y,pch=16)
+         panel.abline(lm(y~x))
+         panel.abline(h=y[4],col='red',lty=3)
+       })
+
+
+# Add a text label to each panel to show the panel number in purple 
+xyplot(root~week|plant,
+       panel=function(x,y){
+         panel.xyplot(x,y,pch=16)
+         panel.abline(lm(y~x))
+         panel.abline(h=y[4],col='red',lty=3)
+         panel.text(8,2,panel.number(),col='purple',cex=0.7)
+       })
+
+detach(results)
+# 29.14.3 Panel barplots 
+## Stacked bar chart
+
+barchart(yield ~ variety | site, data = barley,
+         groups = year, layout = c(2,3), stack = TRUE,
+         #col=c('cornflowerblue','blue'),
+         auto.key = list(space = "right"), # a suitable legend will be drawn by groups
+         ylab = "Barley Yield (bushels/acre)",
+         scales = list(x = list(rot = 45)))
+# layout shows that it produces 3 rows with 2 plots each row 
+# scales is used to rotate the long x labels 
+bwplot(voice.part ~ height, data=singer, xlab="Height (inches)")
+
+dotplot(variety ~ yield | year * site, data=barley)
+
+# 29.14.5 Panel histograms 
+data<-read.table('SilwoodWeather.txt',header=T)
+attach(data)
+names(data)
+
+histogram(~lower|as.factor(month),type='count',
+          xlab='minimum temperature',
+          ylab='frequency',
+          breaks=seq(-12,28,2),
+          strip=strip.custom(bg='lightgrey',par.strip.text=list(col="black", cex=.8, font=3))
+          )
+detach(data)
+
+
+library(lattice)
+histogram(~height | voice.part, data = singer,
+          strip = strip.custom(bg="lightgrey",
+                               par.strip.text=list(col="black", cex=.8, font=3)),
+          main="Distribution of Heights by Voice Pitch",
+          xlab="Height (inches)") 
+
+# 29.14.6 Effect sizes 
+# Use effects package which takes a model object and provides trellis plots of specified effects
+library(effects)
+data<-read.table('daphnia.txt',header=T)
+attach(data)
+model<-lm(Growth.rate~Water*Detergent*Daphnia)
+daph.effects<-allEffects(model) # calculate all effects and plot by specifying interactions in quote
+plot(daph.effects,'Water:Detergent:Daphnia',main='Effects')
+detach(data)
+
+# 29.14.7 More panel functions 
+
+# Use built-in data OrchardSprays
+# groups=rowpos assigns different color for each group
+#
+xyplot(decrease~treatment,OrchardSprays,groups=rowpos,
+       type='a',
+       auto.key=
+         list(space='right',points=TRUE,lines=TRUE))
+xyplot(decrease~treatment,OrchardSprays,groups=rowpos,
+       type='a',
+       panel='panel.superpose',
+       auto.key=
+         list(space='right',points=TRUE,lines=TRUE))
