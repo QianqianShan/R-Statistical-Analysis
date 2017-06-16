@@ -1,0 +1,489 @@
+---
+title: "Chapter 11 Analysis of Variance | Chapter 12 Analysis of  Covariance"
+author: "Qianqian Shan"
+date: "June 3, 2017"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_knit$set(root.dir = "therbookdata")
+```
+
+
+# Chapter 11 Analysis of Variance 
+
+Regression and ANOVA are identical approaches except for teh nature of the explanatory variables. The emphasis in ANOVA was traditionally on hypothesis testing. 
+
+## One-way ANOVA
+
+Assumptions for ANOVA: 
+
+1. random sampling 
+
+2. errors are normally distributed and independent 
+
+3. equal variance 
+
+4. additivity of treatment effects.
+
+
+```{r}
+
+results <- read.table("yields.txt", header = TRUE)
+attach(results)
+names(results)
+results
+
+# group means 
+sapply(list(sand, clay, loam), mean)
+lapply(list(sand, clay, loam), mean)
+
+
+# 
+frame <- stack(results)
+head(frame, 3)
+names(frame) <- c("yield", "soil")
+attach(frame)
+tapply(yield, soil, var)
+
+
+# test for homogeneous variance 
+fligner.test(yield ~ soil) # no significant difference 
+
+detach(results)
+``` 
+
+## Effect sizes 
+
+1. Use `plot.design` which takes a formula when more than one factors. 
+
+2. Use `model.tables` which takes a model object when there is at least one factor, computes summary tables for model fits, especially complex **aov** fits.  
+
+3. Use `summary.lm` 
+
+
+Plots for interpreting one-way ANOVA: 
+
+* box and whisker 
+
+* barplots with error bars 
+
+
+```{r}
+model <- aov(yield ~ soil)
+
+model.tables(model, se = TRUE) # compute standard error 
+model.tables(model, type = "means", se = TRUE)
+model.tables(model, type = "effects", se = TRUE)
+detach(frame)
+
+# plots 
+
+# boxplot 
+comp <- read.table("competition.txt", header = TRUE) 
+attach(comp)
+names(comp)
+
+plot(clipping, biomass, xlab = "Competition treatment",
+     ylab = "Biomass", col = "yellow")
+
+# error bars 
+error.bars <- function(yv, z, nn)
+{xv <- barplot(yv, ylim = c(0, (max(yv) + max(z))),
+               col = "green", names = nn,
+               ylab = deparse(substitute(yv))) 
+# add bars to barplot 
+for (i in 1:length(xv)) {
+arrows(xv[i], yv[i] + z[i], xv[i], yv[i] - z[i], 
+       angle = 90, code = 3, length = 0.15)
+  # length is the length of the edges of the arrow head (in inches).
+ }
+}
+
+model <- aov(biomass ~ clipping)
+summary(model)
+
+table(clipping) # equal size 
+str(summary(model)[[1]])
+sigma.square <- summary(model)[[1]][3][2, ] # the mse 
+
+se1 <- sqrt(sigma.square/6) # standard error of the means 
+
+se <- rep(se1, 5)
+se
+
+labels <- levels(clipping)
+
+ybar <- tapply(biomass,clipping,mean)
+
+error.bars(ybar, se, labels)
+
+# use qt(0.975, 5)
+error.bars(ybar, 2.570582*se, labels)
+detach(comp)
+``` 
+
+## Factorial experiments 
+Use `aov` or `lm` to fit a factorial analysis of variance. 
+
+```{r}
+
+weights <- read.table("growth.txt", header = TRUE) 
+attach(weights)
+names(weights)
+tapply(gain, list(diet,supplement), mean)
+barplot(tapply(gain, list(diet,supplement), mean),
+        beside = TRUE, ylim=c(0, 30), xlab = "Trt",
+        col = c("orange", "yellow", "cornsilk"))
+
+labs <- c("Barley","Oats","Wheat")
+legend("topright",labs,fill= c("orange","yellow","cornsilk"), cex = 0.7)
+
+
+# full model 
+model <- aov(gain ~ diet * supplement)
+summary(model)
+summary.lm(model)
+
+# simplify the model by removing the interaction term 
+model <- aov(gain ~ diet + supplement)
+summary.lm(model) 
+
+
+# further simplify the model by combining factors 
+supp2 <- factor(supplement)
+levels(supp2)
+
+levels(supp2)[c(1, 4)] <- "best"
+levels(supp2)[c(2, 3)] <- "worst"
+levels(supp2)
+
+# fit the model with new supplement levels 
+model2 <- aov(gain ~ diet + supp2)
+anova(model, model2)
+
+summary.lm(model2) # minimal model as all parameters are significant 
+
+detach(weights)
+``` 
+
+## Pseudoreplication: Nested designs and split plots 
+
+Deal with pitfalls of pseudoreplication: 
+
+* nested sampling as when repeated measurements are taken from the same individual 
+
+* split-plot analysis as when designed experiments have different treatments applied to plots of different sizes 
+
+
+```{r}
+yields <- read.table("splityield.txt", header = TRUE) 
+attach(yields)
+names(yields)
+
+# the Error structure has plot size from largest to smallest from left to right
+# the smallest plot size(fertilizer in this case) doesn't need to appear in the Error term 
+model <- aov(yield ~ irrigation * density * fertilizer + Error(block/irrigation/density))
+summary(model)
+
+interaction.plot(fertilizer, irrigation, yield)
+
+interaction.plot(density, irrigation, yield)
+detach(yields)
+``` 
+
+
+## Variance component analysis 
+
+For random effects, we are often interested in how much of the variation in the response variable can be attributed to a given factor, this procedure is called **variance component analysis**. 
+
+```{r}
+rats <- read.table("rats.txt", header = TRUE) 
+attach(rats)
+names(rats)
+head(rats, 10) # a total of 6 rats used for 36 rows 
+Treatment <- factor(Treatment) # 3 treatment s
+Rat <- factor(Rat)
+Liver <- factor(Liver)
+
+
+# analysis ignoring the pseudoreplication 
+model <- aov(Glycogen ~ Treatment)
+summary(model) # show significant effects of Treatment but this is due to the pseudo replication 
+# df is wrong for residuals 
+
+
+# average away the pseudo replication 
+(means <- tapply(Glycogen, list(Treatment, Rat), mean))
+
+(treat <- gl(3, 1, length = 6))
+
+# fit the non-pseudo replicated model 
+model <- aov(as.vector(means) ~ treat)
+summary(model) # degree of freedom is correct now 
+
+
+# fit the correct analysis using aov with multiple error terms 
+# rats within treatment, liver within rat 
+model2 <- aov(Glycogen ~ Treatment + Error(Treatment/Rat/Liver)) 
+summary(model2)
+detach(rats)
+```
+
+
+## Effect sizes in ANOVA: `aov` or `lm` ? 
+
+The difference between `lm` and `aov` is mainly in the form of the output from `summary`.
+
+```{r}
+daphnia <- read.table("Daphnia.txt",header=T) 
+attach(daphnia)
+names(daphnia)
+
+# model using aov 
+model1 <- aov(Growth.rate ~ Water * Detergent * Daphnia)
+summary(model1)
+
+# model using lm 
+model2 <- lm(Growth.rate ~ Water * Detergent * Daphnia)
+summary(model2)
+
+summary.lm(model1)
+summary.aov(model2)
+
+# summarize the effect sizes 
+plot.design(Growth.rate ~ Water * Detergent * Daphnia)
+
+model.tables(model1, "means", se = TRUE)
+
+detach(daphnia)
+``` 
+
+
+## Multiple comparisons 
+
+* `TukeyHSD` for Tukey's honest significant differences 
+
+* `pairwise.t.test` for adjusted p values for all comparisons 
+
+
+```{r}
+data <- read.table("Fungi.txt", header = TRUE) 
+attach(data)
+names(data)
+
+# test whether there is any variation in fungus yield to explain 
+model <- aov(Fugus.yield ~ Habitat)
+summary(model)
+
+# Tukey's test for p values
+head(TukeyHSD(model)[[1]])
+str(TukeyHSD(model))
+# or plot it 
+plot(TukeyHSD(model), las = 1, cex.axis = 0.3)
+
+# use pairwise.t.test 
+pairwise.t.test(Fugus.yield, Habitat)
+
+# try other adjusted method 
+pairwise.t.test(Fugus.yield, Habitat, p.adjust.method = "none")
+
+# a package for multiple comparisons
+# install.packages("multcomp")
+detach(data)
+``` 
+
+
+## Multivariate analysis of variance using `manova`
+
+
+```{r}
+data <- read.table("manova.txt", header = TRUE)
+attach(data)
+names(data)
+
+# three response variables 
+Y <- cbind(tear, gloss, opacity)
+
+model <- manova(Y ~ rate * additive)
+
+summary(model)
+
+# look at each of the three response variables separately 
+summary.aov(model)
+
+summary.manova(model)
+detach(data)
+``` 
+
+# Chapter 12 Analysis of Covariance 
+
+The response variable is continuous, and there is at least one continuous explanatory vairable and at least one categorical explanatory variable. 
+
+
+```{r}
+regrowth <- read.table("ipomopsis.txt", header = TRUE) 
+attach(regrowth)
+names(regrowth)
+
+# plot Fruit ~ Root, with different colors for different Grazing 
+as.numeric(Grazing) # 2, 1
+plot(Root, Fruit, pch = 16, col = c("blue", "red")[as.numeric(Grazing)])
+levels(Grazing)
+abline(lm(Fruit[Grazing == "Grazed"] ~ Root[Grazing == "Grazed"]), col = "blue")
+abline(lm(Fruit[Grazing == "Ungrazed"] ~ Root[Grazing == "Ungrazed"]), col = "red")
+
+tapply(Fruit, Grazing, mean)
+
+t.test(Fruit ~ Grazing)
+
+
+# fit different slopes and intercepts 
+ancova <- lm(Fruit ~ Grazing * Root)
+
+summary(ancova)
+
+anova(ancova)
+
+# a simplified model 
+ancova2 <- update(ancova, ~ . - Grazing:Root)
+
+# compare the two models 
+anova(ancova, ancova2)
+
+# check if the Grazing effect is significant or not 
+ancova3 <- update(ancova2, ~ . - Grazing)
+
+anova(ancova2, ancova3) # it's significant 
+
+summary(ancova2)
+
+# use "step" starts with the full model and do simplification based on AIC 
+step(ancova)
+detach(regrowth)
+``` 
+
+
+## ANCOVA with two factors and one continuous covariate 
+
+```{r}
+
+Gain <- read.table("Gain.txt",header=T) 
+attach(Gain)
+names(Gain)
+
+# maximal model with 24 parameters 
+m1 <- lm(Weight ~ Sex * Age * Genotype)
+summary(m1)
+
+# model simplification 
+m2 <- step(m1)
+summary(m2)
+
+
+test <- aov(Weight ~ Genotype)
+plot(TukeyHSD(test), las = 1, cex.axis = 0.5)
+# further simplification by combining factors levels 
+newGenotype <- Genotype
+levels(newGenotype)
+
+# overwrite the original levels 
+levels(newGenotype)[c(3, 5)] <- "ClonesCandE"
+levels(newGenotype)[c(2, 4)] <- "ClonesBandD"
+levels(newGenotype)
+# four levels for genotype now 
+
+
+# fit the new model 
+m3 <- lm(Weight ~ Sex + Age + newGenotype)
+anova(m2, m3)
+summary(m3) # m3 preferred 
+
+
+# draw fitted lines through a scatterplot 
+plot(Age, Weight, type = "n")
+colours <- c("green", "red", "black", "blue")
+lines <- c(1, 2)
+symbols <- c(16, 17)
+points(Age, Weight, pch = symbols[as.numeric(Sex)], col=colours[as.numeric(newGenotype)])
+xv <- c(1, 5)
+for (i in 1:2) { 
+  for (j in 1:4) {
+      a <- coef(m3)[1] + (i > 1) * coef(m3)[2] + (j > 1)*coef(m3)[j + 2]
+      b <- coef(m3)[3]
+      yv <- a + b*xv
+lines(xv, yv, lty = lines[i], col = colours[j]) } 
+}
+
+detach(Gain)
+``` 
+
+## Contrasts and the parameters of ANCOVA models 
+
+```{r}
+
+Ancovacontrasts <- read.table("Ancovacontrasts.txt", header = TRUE)
+attach(Ancovacontrasts)
+names(Ancovacontrasts)
+
+tapply(weight, list(sex, age), mean)
+
+# fit two separate models conditioning on sex 
+lm(weight[sex == "male"] ~ age[sex == "male"])
+lm(weight ~ age, subset = (sex == "female"))
+
+# fit overall model 
+lm(weight ~ age)
+
+# default contrasts in R  
+options(contrasts = c("contr.treatment", "contr.poly"))
+model1 <- lm(weight ~ age * sex)
+summary(model1)
+
+
+# 
+options(contrasts = c("contr.helmert", "contr.poly"))
+model2 <- lm(weight ~ age*sex)
+summary(model2)
+
+# 
+options(contrasts = c("contr.sum", "contr.poly"))
+model3 <- lm(weight ~ age * sex)
+summary(model3)
+
+# reset 
+options(contrasts = c("contr.sum", "contr.poly"))
+
+# orders matter in summary.aov 
+summary.aov(lm(weight ~ sex * age))
+
+summary.aov(lm(weight ~ age * sex))
+# the above two results are the same 
+
+
+# however, the order matters here 
+attach(regrowth)
+summary.aov(lm(Fruit ~ Grazing * Root))
+
+summary.aov(lm(Fruit ~ Root * Grazing))
+# the above two have different sum of squares: 
+# it's because that in the first example, the x values for the continuous variable(age) were identical 
+# for both sexes, however, the x values (root size) in the second example is different in the two 
+# treatments and mean root size was greater for the grazed plants as shown below 
+tapply(Root, Grazing, mean)
+
+
+# however, the effect sizes and standard errors in the summary.lm table are completely unaffected. 
+summary(lm(Fruit ~ Root * Grazing))
+
+summary(lm(Fruit ~ Grazing * Root))
+
+detach(regrowth)
+detach(Ancovacontrasts)
+``` 
+
+**Summary**: Whenever the x values are different in different factor levels, and/or there is different replication in different factor levels, then SSX, SSY will vary from level to level, and this will affect the way the sum of squares is distributed across the main effects. **However**, it's of no consequence in terms of the interpretation of the model. 
+

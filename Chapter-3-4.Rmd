@@ -1,0 +1,407 @@
+---
+title: 'Chapter 3 Data Input | Chapter 4 Data Frames '
+author: "Qianqian Shan"
+date: "May 20, 2017"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_knit$set(root.dir = "therbookdata")
+
+```
+
+##Data Input from the Keyboard
+
+
+```{r}
+x <- scan()
+```
+
+Data input from files have variables called `fields` and rows called `cases`.
+
+If the file name is forgotten, *file.choose()* could be used.
+```{r eval=FALSE}
+data <- read.table(file.choose(), header = TRUE)
+```
+
+* Data Input using `read.table`
+
+```{r}
+data <- read.table("yields.txt", header = TRUE)
+head(data)
+```
+* `read.delim` can omit `header = T`
+```{r}
+data <- read.delim("yields.txt")
+```
+
+* Data input using a defined function `rt`
+```{r}
+rt <- function(x) read.table(paste(x, ".txt", sep = ''),header = TRUE)
+data <- rt("yields")
+head(data,2)
+```
+
+As the default behavior of `read.table` is to convert character to factors, we need to use `as.is` to specify the columns that should =not be converted to factors. 
+
+```{r}
+murder <- read.table("murders.txt", header = TRUE)
+str(murder)
+murder <- read.table("murders.txt", header = TRUE, as.is = "region")
+str(murder)
+```
+
+Data input directly from the web 
+
+```{r}
+data2 <- read.table("http://www.bio.ic.ac.uk/research/mjcraw/therbook/data/cancer.txt", header = TRUE)
+# URL stands for universal resource locator 
+head(data2)
+```
+
+
+## Read data using `scan()`
+
+```{r}
+# scan will create a list of vectors and we'd like a data frame 
+data <- as.data.frame(scan("worms.txt", skip = 1, what= as.list(rep("", 7)))) # skip=1 will skip the header, 
+# the last argument specify seven fields of character variables  ""
+
+# the variable names are long and meanlingness, next obtain the names and apply them to the data 
+header <- unlist(scan("worms.txt", nlines = 1, what = as.list(rep("",7))))
+header
+names(data) <- header
+head(data,2)
+```
+
+
+Input from complex file structures using `scan`
+
+```{r}
+sapply(1:5, function(i) as.numeric(na.omit(scan("rt.txt", sep = "\t", quiet = TRUE)[(4*i - 3): (4*i)]))) 
+# quiet = T prevents the printing "Read 20 itmes"...
+```
+
+## Reading data from a file using `readLines`
+This is an alternative of `scan`.
+
+```{r}
+line <- readLines("worms.txt")
+line 
+```
+Strip out the tab "\\t" 
+
+
+```{r}
+db <- strsplit(line, "\t") # returns a set of lists 
+db <- (unlist(db))
+dim(db) <- c(7, 21) # variable names dimention comes first 
+t(db)[-1, ] # the first row is the names 
+
+# change it to data frame 
+frame <- as.data.frame(t(db)[-1,])
+head(frame)
+
+# add names 
+names(frame) <- t(db)[1, ]
+head(frame)
+```
+
+Read non-standard files using `readLines`
+```{r}
+readLines("rt.txt")
+```
+Split first on tabs and then on lines 
+
+```{r}
+rows <- lapply(strsplit(readLines("rt.txt"), split = "\t"), as.numeric)
+rows
+strsplit(readLines("rt.txt"), split = "\n") # this is ONE string
+
+# remove NAs from each of the vectors 
+sapply(1:5, function(i) as.numeric(na.omit(rows[[i]])))
+```
+
+## Warnings when you `attach` the dataframe 
+The best approach is NOT to use `attach` 
+
+```{r}
+murder <- read.table("murders.txt", header = TRUE, as.is = "region")
+attach(murder) # warning message shows up as the dataframe name is identical with one of the variable names 
+               # better to rename the dataframe name 
+detach(murder)
+data <- read.table("murders.txt", header = TRUE, as.is = "region")
+attach(data)
+detach(data)
+```
+
+
+Check files exists from the command line 
+```{r}
+file.exists("Decay.txt")
+```
+
+Read dates and times from file, **refer Chapter 2 for instance**
+
+**file paths** 
+* set working directory by `setwd`
+* `basename` returns the last path of a complete path 
+* `dirname` returns the full path except for the last 
+
+```{r}
+basename("c:/temp/thesis/data")
+dirname("c:/temp/thesis/data")
+file.path("","p1","p2","p3", c("file1", "file2"))
+basename(file.path("","p1","p2","p3", c("file1", "file2")))
+dirname(file.path("","p1","p2","p3","filename"))
+```
+
+# Chapter 4 : Dataframes 
+
+A **dataframe** is an object with rows and columns. 
+Ways to create a dataframe: 
+
+* Use `read.table` to read fils .
+
+* Use `data.frame` function to bind together a numner of vectors. 
+
+
+
+```{r}
+worms <- read.table("worms.txt", header = TRUE)
+```
+
+
+
+Summary of a dataframe 
+
+* `summary` 
+* `by` to summarize the dataframe on the basis of factor levels 
+* `aggregate` 
+
+```{r}
+# by(worms[,c(2,3)], worms$Vegetation, sum)
+by(worms, worms$Vegetation, function(x) lm(Worm.density ~ Soil.pH, data= x))
+aggregate(worms[, c(2, 3, 5, 7)], by = list(veg = worms$Vegetation), mean)
+
+# or with more than one classifying factors 
+aggregate(worms[, c(2, 3, 5, 7)], by = list(veg = worms$Vegetation, d = worms$Damp), mean)
+```
+
+
+Note the *different* classes of these two: 
+
+```{r}
+class(worms[3, ])
+class(worms[, 3])
+```
+
+Select rows from a dataframe randomly 
+
+```{r}
+worms[sample(1:20, 8, replace = FALSE), ]
+# sample(x, size, replace = FALSE, prob = NULL)
+```
+
+
+## Sorting dataframes 
+
+```{r}
+worms[order(worms$Slope), ][1:3,]
+
+# order reversely 
+worms[rev(order(worms$Slope)), ][1:5, ]
+
+# order by the first and ties broken by the second, third ... 
+
+worms[order(worms$Vegetation, worms$Worm.density), ][1:5, ]
+
+# select columns by variable names 
+worms[order(worms$Vegetation, worms$Worm.density), c("Vegetation", "Worm.density", "Soil.pH", "Slope")][1:6, ]
+```
+
+## Using logical conditions to select rows from dataframe 
+
+```{r}
+worms[worms$Damp == TRUE, ]
+
+# Use logical operator 
+worms[worms$Worm.density > median(worms$Worm.density) & worms$Soil.pH < 5.2, ]
+
+# extract all numeric columns 
+sapply(worms, is.numeric)
+worms[, sapply(worms, is.numeric)]
+
+# similarly, extract all factor columns 
+worms[, sapply(worms, is.factor)]
+
+# exclude certain rows 
+worms[!(worms$Vegetation == "Grassland"), ]
+
+# or use which function 
+worms[ - which(worms$Damp == FALSE), ]
+
+# or 
+worms[!(worms$Damp == FALSE), ]
+
+# or 
+worms[worms$Damp == TRUE, ]
+```
+
+## Omitting rows containint missing values `NA` 
+* `na.omit` 
+* `na.exclude` , similar with `na.omit`, but different in the class of `na.action`  attribute of the result, and thus `na.exclude` padded the original length by inserting `NA` for using `naresid` and `napredict`. 
+* `complete.cases` returns logical vector indicating which cases are complete 
+
+```{r}
+data <- read.table("worms.missing.txt", header = TRUE)
+dim(data)
+
+nona <- na.omit(data)
+dim(nona) # 3 NA values deleted 
+
+nona1 <- na.exclude(data)
+dim(nona1)
+
+# 
+complete.cases(data)
+# Analogue of na.omit 
+data[complete.cases(data), ]
+
+# check the number of NA values of each column 
+apply(data, 2, is.na)
+# count the NA values 
+apply((apply(data, 2, is.na)), 2, sum)
+```
+
+## Using `order` and `!duplicated` to eliminate pseudoreplication 
+
+Extract each vegetation type and each has the highest density within that vegetation type.
+```{r}
+# order data by density 
+new <- worms[rev(order(worms$Worm.density)), ]
+new[!duplicated(new$Vegetation),]
+``` 
+## Complex ordering with mixed directions 
+There may be multiple sorting variables with different sorting directions. 
+```{r}
+# sort Vegetation in alphabetical order and density in decreasing order 
+worms[order(worms$Vegetation, -worms$Worm.density), ]
+
+# As using minus sign only works for numerical variables, so for factors, we need to 
+# first use "rank" to convert levels to numeric 
+worms[order(-rank(worms$Vegetation), -worms$Worm.density), ]
+
+
+# select columns that contains character "S"
+grep("S", names(worms)) # returns the corresponding column number 
+worms[, grep("S", names(worms))]
+```
+
+## A dataframe with row names instead of row numbers 
+Can suppress the creation of row numbers and allocate unique names to each row by altering the syntax of the `read.table` function. For example, add `row.names= ` command. 
+```{r}
+worms2 <- read.table("worms.txt", header = TRUE, row.names = 1)
+head(worms2) # row numbers are suppressed 
+```
+
+## Eliminating duplicated rows from a dataframe 
+```{r}
+dups <- read.table("dups.txt", header = TRUE)
+dups # row 3 and 5 are the same 
+
+# strip out duplicated rows 
+unique(dups)  # row numbers are still the original ones 
+
+# the row that are duplicates 
+dups[duplicated(dups), ] 
+```
+
+## Dates in dataframes 
+
+```{r}
+nums <- read.table("sortdata.txt", header = TRUE)
+head(nums, 3) # data is in format dmy  
+
+
+# In order to order the data by date, first need to convert date into date time format 
+# to avoid sorting based on day - month 
+dates <- strptime(nums$date, format = "%d/%m/%Y")
+nums <- cbind(nums, dates)
+head(nums[order(dates), ])
+``` 
+
+## Using `match` function in dataframes 
+
+```{r}
+herb <- read.table("herbicides.txt", header = TRUE)
+# add corresponding recommended 
+recs <- data.frame(
+  worms, hb = herb$Herbicide[match(worms$Vegetation, herb$Type)]
+) 
+# match returns a vector of the positions of (first) matches of its first argument in its second
+head(recs)
+``` 
+
+## Merging two dataframes 
+
+```{r}
+lifeforms <- read.table("lifeforms.txt", header = TRUE)
+flowering <- read.table("fltimes.txt", header = TRUE)
+lifeforms
+flowering 
+# two data have species in common 
+
+# merge with only rows had complete cases in both 
+merge(flowering, lifeforms) 
+
+# include all 
+both <- merge(flowering, lifeforms, all = TRUE) # NA values produced 
+both
+
+# now add a new column from another data frame to the above data frame 
+seeds <- read.table("seedwts.txt", header = TRUE)
+head(seeds) # columns have different names 
+
+merge(both, seeds, by.x = c("Genus", "species"), by.y = c("name1", "name2"))
+```
+
+## Adding margins to a dataframe 
+
+```{r}
+frame <- read.table("sales.txt", header = TRUE)
+frame
+
+# add row means 
+people <- rowMeans(frame[, -1])
+people <- people - mean(people)
+new.frame <- cbind(frame, people)
+new.frame
+
+# add col mean 
+season <- colMeans(frame[, -1])
+season <- season - mean(season)  # cannot use rbind directly as columns are different 
+
+# copy one row 
+new.row <- new.frame[1, ]
+new.row[1] <- "seasonal effects"
+new.row[2:5] <- season
+new.row[6] <- 0
+new.frame <- rbind(new.frame, new.row)
+new.frame
+
+# use sweep to subtract the grand mean from each value 
+gm <- mean(unlist(new.frame[1:5, 2:5])) # overall mean 
+gm <- rep(gm, 4)
+new.frame[1:5, 2:5] <- sweep(new.frame[1:5, 2:5], 2, gm) # sweep out summary statistic
+
+
+# put the grand/ overall mean in the bottom right corner 
+new.frame[6, 6] <- gm[1]
+new.frame
+```
+
