@@ -1,0 +1,778 @@
+---
+title: "Chapter 19 Mixed-Effects Models | Chapter 20 Non-Linear Regression"
+author: "Qianqian Shan"
+date: "June 9, 2017"
+output:
+  html_document: default
+  pdf_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_knit$set(root.dir = "therbookdata")
+```
+
+The essence in deciding whether a categorical variable should be treated as a fixed effect or random effect: 
+
+1. Fixed effects influence only the **mean** of y.
+
+2. Random effects influence only the **variance** of y. 
+
+
+Random effects arise from two contrasting kinds of circumstances: 
+
+1. observational studies with hierarchical structure, 
+
+2. designed experiments with different spatial or temporal scales. 
+
+
+**Fundamental assumptions of linear mixed-effects models**: 
+
+1. Within group errors are independent with mean 0 , variance $\sigma^2$ and are independent of the random effects. 
+
+2.  The random effects are normally distributed with mean 0 and covariance matrix $\Psi$. 
+
+3. The random effects are independent in different groups. 
+
+4. The covariance matrix doesn't depend on the group. 
+
+
+
+
+## Replication and pseudo-replication 
+
+**Replicates** properties: 
+
+1. Independent 
+
+2. NOT grouped together in one place as aggregation means that they are not spatially independent
+
+3. Be of appropriate spatial scale 
+
+4. Repeated measures are not replicates.
+
+
+**Pseudo-replication** occurs when the data has more degrees of freedom than really has: 
+
+1. temporal involving repeated measurements from the same individual 
+
+2. spatial involving several measurements taken from the same vicinity. 
+
+
+
+**Ways to deal with pseudo-replication**: 
+
+1. Average away the pseudo-replication and carry out analysis on the means 
+
+2. Carry out separate analysis for each time period 
+
+3. Use proper time series analysis or mixed effects models. 
+
+
+## `lme` and `lmer` functions 
+
+* `lme` has separate fixed and random effects specification, $fixed = y \tilde{} 1$, $random = \tilde{} 1|a/b/c$, meaning that "there are three random effects with c nested within b and b is nested within a", $lme(fixed = y \tilde{} 1, randome = \tilde{}1|a/b/c)$. 
+
+* `lmer` has fixed and random effects specified togher, $lmer(y \tilde{} 1 +(1|a/b/c)$.
+
+
+## Best linear unbiased predictors 
+
+In mixed-effects models, the correlation between the pseudo replicates within a group causes **shrinkage**, and the best linear unbiased predictor $a_i = (\overline{y_i} - \mu) (\frac{\sigma_a^2}{\sigma_a^2 + \sigma^2/n})$, where $\sigma^2$ is the residual variance, $\sigma_a^2$ is the between group variance which introduces the correlation between the pseudo replicates within each group. 
+
+More details on BLUP later, or refer <https://dnett.github.io/S510/21BLUP.pdf>. 
+
+
+
+## Designed experiments with different spatial scales: Split plots 
+
+If we want to use `anova` to compare mixed models with different fixed effects structurs, we jmust use maximum likelihood: `method = "ML"` for `lme, `REML = FALSE` for `lmer`. 
+
+For more details on `REML`, see <https://dnett.github.io/S510/20REML.pdf>. 
+
+1. If the experiment is balanced and there are no missing values, use `aov` with `Error` term do describe the structure of the spatial pseudoreplication. See Chapter 11.4 for example. 
+
+2. If the experiment is not balanced, need to use `lme` or `lmer` for model simplication to estimate the p values of the significant interaction terms. 
+
+
+```{r}
+# Linear model for a split-plot experiment 
+
+yields <- read.table("splityield.txt", header = TRUE)
+attach(yields)
+head(yields)
+
+library(nlme)
+
+model <- lme(yield ~ irrigation * density * fertilizer, 
+             random = ~ 1 | block/irrigation/density)
+summary(model) # the only significant effect is irrigation 
+
+# simplify the model 
+model <- lme(yield ~ (irrigation + density + fertilizer)^2, 
+             random = ~ 1 |  block/irrigation/density)
+summary(model)
+
+# remove the fertilizer by density interaction 
+model <- lme(yield ~ irrigation * density + irrigation * fertilizer, 
+             random = ~ 1 | block/irrigation/density)
+summary(model)
+
+
+# use anova to compare models 
+
+model.lme <- lme(yield ~ irrigation * density * fertilizer,
+                  random = ~ 1| block/irrigation/density, method = "ML")
+
+model.lme.2 <- update(model.lme,~. - irrigation:density:fertilizer)
+anova(model.lme, model.lme.2)
+
+
+# remove two way interaction 
+model.lme.3 <- update(model.lme.2, ~. - density:fertilizer)
+anova(model.lme.3, model.lme.2)
+
+
+model.lme.4 <- update(model.lme.3,~. - irrigation:fertilizer)
+anova(model.lme.3, model.lme.4) # model3 is better 
+
+model.lme.5 <- update(model.lme.2, ~. - irrigation:density)
+anova(model.lme.5, model.lme.2)
+
+summary(model.lme.3)
+
+plot(model.lme.3)
+
+plot(model.lme.3, yield ~ fitted(.))
+
+qqnorm(model.lme.3, ~ resid(.) | block) # close to normal distribution 
+
+
+# do the analysis by lmer 
+library(lme4)
+b <- block
+bi <- block:irrigation
+
+bid <- block:irrigation:density
+
+model1 <- lmer(yield ~ irrigation * density * fertilizer 
+               + (1|b) + (1|bi) + (1|bid), REML = FALSE)
+print(model1, cor = F) # switch off the matrix of correlations for the fixed effects 
+
+
+detach(yields)
+
+``` 
+
+## Mixed-effects models with temporal pseudoreplication 
+
+When the random effect(for example, week) is continuous, we should use `$random = \tilde{} week | plant$ instead of $random = \tilde{} 1 | week$, while the latter used for categorical random effects. 
+
+```{r}
+
+results <- read.table("fertilizer.txt", header = TRUE)
+attach(results)
+head(results)
+# root is y 
+
+
+library(nlme)
+library(lattice)
+
+# trellis plotting, 
+# convert dataframe into groupedData object, 
+# specify the nesting structure 
+# indicate the fixed effect by defining "fertilizer" as outer to this nesting(fixed effect)
+
+# week is random effects 
+results <- groupedData(root ~ week | plant, outer = ~ fertilizer, results)
+str(results)
+
+plot(results)
+
+plot(results, outer = TRUE)
+
+# linear mixed effects using REML
+model <- lme(root ~ fertilizer, random = ~week|plant)
+summary(model)
+
+# one-way anova on non-pseudoreplicated data 
+model2 <- aov(root ~ fertilizer, subset =(week == 10))
+summary(model2)
+
+summary.lm(model2)
+
+# the above two models are slightly different
+# lm/aov estimates linear models by maximum likelihood estimates of the parameters based on arithmetic means 
+# lme use BLUP estimates 
+
+detach(results)
+``` 
+
+
+## Times series analysis in mixed-effects models 
+
+* Use `ACF` to check the autocorrelation structure of residuals. 
+
+* Model autocorrelation structure with standard `corStruct` classes, see Chapter 26.6 for more details(page 863).
+
+
+```{r}
+
+data(Ovary)
+attach(Ovary)
+names(Ovary)
+str(Ovary)
+# follicles is y 
+
+plot(Ovary)
+
+# fit model based on prior knowledge and estimate the residuals correlation structure 
+model <- lme(follicles ~ sin(2 * pi * Time) + cos(2 * pi * Time),
+             data = Ovary, random = ~ 1| Mare)
+summary(model)
+
+plot(ACF(model), alpha = 0.05) # alpha = 0.05 shows the 95% critical lines 
+
+# assume the first two lags have non zero correlations 
+# moving average 
+model2 <- update(model, correlation = corARMA(q = 2))
+anova(model, model2) # better 
+
+
+# fit first order autoregressive model 
+model3 <- update(model2, correlation = corAR1())
+anova(model2, model3) # better than model2 
+
+
+# error checking for model3 
+plot(model3)
+
+# plot by mare 
+plot(model3, resid(., type = "p") ~ fitted(.) | Mare) # OK 
+
+# check normal error assumption 
+qqnorm(model3, ~ resid(.) | Mare) # OK 
+detach(Ovary)
+
+```
+
+
+## Random effects in designed experiments 
+
+Re-analyze the data in Chapter 11.4, instead of using `aov` and `Error`, we specify linear mixed effects model here. 
+
+```{r}
+dd <- read.table("rats.txt", header = TRUE)
+attach(dd)
+head(dd)
+# Glycogen is y 
+str(dd)
+
+# convert covariates into factors 
+Treatment <- factor(Treatment)
+Liver <- factor(Liver)
+Rat <- factor(Rat)
+
+# unique factor levels for each rat and each liver bit 
+rat <- Treatment:Rat
+rat
+str(rat)
+liver <- Treatment:Rat:Liver
+liver 
+
+
+# fit the model 
+library(lme4)
+model <- lmer(Glycogen ~ Treatment + (1 | rat) + (1 | liver))
+summary(model)
+
+
+# express variance components in percentages 
+vars <- c(14.167, 36.065, 21.167)
+100 * vars/sum(vars)
+# 19.8% is between liver bits within rats 
+# 29.6% between readings within liver bits within rats 
+detach(dd)
+``` 
+
+
+## Regression in mixed effects models 
+
+1. Use `lmList` to fit lots of linear regression models 
+
+2. Use `lme` to fit one mixed-effects model 
+
+
+
+```{r}
+
+yields <- read.table("farms.txt", header = TRUE) 
+attach(yields)
+
+names(yields)
+str(yields)
+# size is y 
+table(farm)
+
+plot(N, size, pch = rep(16:18, each = 40), col = farm)
+
+
+# fit  a set of linear models 
+linear.models <- lmList(size ~ N | farm, data = yields)
+
+coef(linear.models) # intercepts and slopes vary a lot 
+
+
+# fit mixed effects model specified entirely in terms of random effects 
+library(nlme)
+random.model <- lme(size ~ 1, random = ~ N | farm)
+coef(random.model) # less extreme 
+
+
+# plot the intercepts and slopes from the two models 
+mm <- coef(random.model)
+ll <- coef(linear.models)
+
+par(mfrow=c(1,2))
+plot(ll[, 1], mm[, 1], pch = 16, xlab = "linear",
+     ylab = "random effects", main = "Intercept")
+abline(0, 1)
+plot(ll[, 2], mm[, 2], pch = 16, xlab = "linear",
+     ylab = "random effects", main = "Slope")
+abline(0,1)
+par(mfrow = c(1, 1))
+
+
+# fit mixed model with both fixed effects and random effects 
+# use method = "ML" for model comparisons 
+
+farm <- factor(farm)
+mixed.model1 <- lme(size ~ N * farm, random = ~ 1 | farm, method = "ML")
+mixed.model2 <- lme(size ~ N + farm, random = ~ 1 | farm, method = "ML")
+mixed.model3 <- lme(size ~ N, random = ~ 1 | farm, method = "ML")
+mixed.model4 <- lme(size ~ 1, random = ~ 1 | farm, method = "ML")
+anova(mixed.model1, mixed.model2, mixed.model3, mixed.model4)
+# model2 is selected 
+
+
+# do analysis of variance 
+model <- lm(size ~ N * factor(farm))
+summary(model)
+
+
+
+
+model2 <- lm(size ~ N + factor(farm))
+anova(model, model2) # model2 selected 
+
+model3 <- lm(size ~ N)
+anova(model2, model3)
+
+detach(yields)
+```
+
+
+## Generalized linear mixed models 
+
+* `glmer` from `lme4` package is used. 
+
+* Average the random effects and only work on the fixed effects, if it's poisson error, use code like: 
+
+ *d2<-aggregate(data,list(farm,field),mean)*
+ 
+ *model<-lm(log(count)~factor(farm)+factor(field),data=d2)*
+ 
+ *summary(model)*
+
+
+
+
+# Chapter 20 Non-linear Regression 
+
+When the relationship between y and x cannot be linearized by transformation of the response variable or(and) explanatory variables, non-linear regression will be useful. 
+
+`nls` stands for non-linear least squares. 
+
+**Frequently used non-linear functions**: 
+
+Name|Equation 
+------------|--------------------
+**Asymptotic functions** | 
+Michaelise-Menten | $y = \frac{ax}{1+bx}$
+2-parameter asymptotic exponential | $y = a(1-e^{-bx})$
+3-parameter asymptotic exponential | $y = a - be^{-cx}$
+**S-shaped functions**|
+2-parameter logistic | $y = \frac{e^{a+bx}}{1+e^{a+bx}}$
+3-parameter logistic| $y = \frac{a}{1+be^{-cx}}$
+4-parameter logistic | $y = a + \frac{b-a}{1+e^{(c-x)/d}}$
+Weibull | $y = a -be^{-cx^d}$
+Gompertz | $y = ae^{-be^{-cx}}$
+**Humped curves** |
+Ricker curve | $y = axe^{-bx}$
+First-order compartment | $y = ke^{-e^ax} - e^{-e^bx}$
+Bell-shaped | $y =ae^{-\|bx\|^2}$
+Biexponential | $y = ae^{bx} - c e^{-dx}$
+
+
+```{r}
+deer <- read.table("jaws.txt", header = TRUE)
+attach(deer)
+head(deer)
+# bone is y 
+
+plot(age, bone, pch = 21, col = "purple", bg = "green")
+
+# fit 3 parameter asymptotic exponential 
+model <- nls(bone ~ a - b * exp( - c * age), start = list(a = 120, b = 110, c = 0.064))
+summary(model)
+
+
+# 2 parameter 
+model2 <- nls(bone ~ a * (1 - exp(- c * age)), start = list(a = 120, c = 0.064))
+anova(model, model2) # minimal adequate 
+
+# add fitted lines 
+av <- seq(0, 50, 0.1)
+
+bv <- predict(model2, list(age = av))
+lines(av, bv, col = "red")
+
+summary(model2)
+str(summary(model2))
+
+sum.model2 <- summary(model2)
+sum.model2$sigma
+sum.model2$df[2]
+
+# sum of squares of error for model2 
+sse <- as.vector((sum.model2$sigma)^2 * sum.model2$df[2])
+sse
+
+
+# total variation 
+null <- lm(bone ~ 1)
+str(summary.aov(null)) # one list 
+
+sst <- as.vector(unlist(summary.aov(null)[[1]][2]))
+sst
+
+
+# percentage of variation explained by the model 
+100*(sst - sse)/sst
+
+
+
+
+# compare Michaelis-Menten and asyptotic exponential 
+(model3 <- nls(bone ~ a * age/(1 + b * age), start = list(a = 8, b = 0.08)))
+
+# add fitted lines to the plot 
+yv <- predict(model3, list(age = av))
+lines(av, yv, col = "blue")
+legend("topleft", legend = c("Michaelis-Menten", "2-parameter asyptotic"),
+       col = c("blue", "red"), lty = 1)
+
+detach(deer) 
+``` 
+
+## Generalized additive models 
+
+When we don't have any theory or any mechanistic model to suggest a particular functional form to describe the relationship, GAM will be useful. 
+
+```{r}
+rm(x, y)
+humped <- read.table("hump.txt", header = TRUE)
+attach(humped)
+names(humped)
+plot(x, y, pch = 21, col = "blue", bg = "lavender") 
+
+library(mgcv)
+
+model <- gam(y ~ s(x))
+
+xv <- seq(0.5, 1.3, 0.01)
+yv <- predict(model, list(x = xv))
+lines(xv, yv)
+
+summary(model)
+
+detach(humped)
+``` 
+
+
+## Grouped data for non-linear estimation 
+
+* `nlsList` fits the same functional form of a group of subjects by the "|" 
+
+* `nlme` fits the nonlinear mixed effects model 
+
+More details on <https://dnett.github.io/S510/29GLMMannotated.PDF>. 
+
+
+```{r}
+reaction <- read.table("reaction.txt", header  = TRUE)
+attach(reaction)
+head(reaction)
+# rate is y 
+
+
+plot(enzyme, rate, pch = 20 + as.numeric(strain), bg = 1+as.numeric(strain))
+
+library(nlme)
+
+# fit the same model but with different parameters for each strain 
+model <- nlsList(rate ~ c + a * enzyme/(1 + b * enzyme)|strain,
+                  data = reaction, start = c(a = 20, b = 0.25, c = 10))
+
+
+summary(model)
+
+
+# plot 
+reaction <- groupedData(rate ~ enzyme | strain, data = reaction)
+plot(reaction)
+
+# fit non-linear mixed effects model 
+model2 <- nlme(rate ~ c + a * enzyme/(1 + b * enzyme), fixed = a + b + c ~ 1,
+      random = a + b + c ~ 1 | strain, data = reaction, start = c(a = 20, b = 0.25, c = 10))
+
+plot(augPred(model2)) 
+# augPred returns a data frame with four columns representing, respectively, 
+# the values of the primary covariate, the groups (if object does not have a 
+# grouping structure, all elements will be 1), the predicted or observed values, 
+# and the type of value in the third column
+model2
+summary(model2)
+
+coef(model2)
+v <- vcov(model2)
+v
+plot(enzyme, rate, pch = 20 + as.numeric(strain), bg = 1 + as.numeric(strain))
+
+xv <- seq(min(enzyme), max(enzyme), length = 100)
+for(i in 1:5){
+yv <- coef(model)[i, 3] + coef(model)[i, 1] * xv/(1 + coef(model)[i, 2] * xv) 
+lines(xv, yv, col = (i + 1)) }
+
+detach(reaction)
+rm(xv, yv)
+
+``` 
+
+
+## Non-linear time series models (temporal pseudo-replication) 
+
+
+```{r}
+
+nl.ts <- read.table("nonlinear.txt", header = TRUE) 
+attach(nl.ts)
+head(nl.ts)
+
+# group by dish 
+growth <- groupedData(diam ~ time | dish, data = nl.ts) 
+
+model <- nlme(diam ~ a + b * time/(1 + c * time),
+      fixed = a + b + c ~ 1,
+      random = a + b + c ~ 1,
+      data = growth,
+      correlation = corAR1(),
+      start = c(a = 0.5, b = 5, c = 0.5))
+summary(model)
+
+coef(model)
+
+plot(augPred(model))
+
+
+
+detach(nl.ts)
+``` 
+
+
+## Self-starting functions 
+
+Function | Description 
+-------------|--------------------------------------------------------------------------------
+SSasymp | asymptotic regression model;
+SSasympOff | asymptotic regression model with an offset; 
+SSasympOrig | asymptotic regression model through the origin;
+SSbiexp | biexponential model;
+SSfol | first-order compartment model;
+SSfpl | four-parameter logistic model;
+SSgompertz | Gompertz growth model;
+SSlogis | logistic model;
+SSmicmen |  Michaelis–Menten model;
+SSweibull | Weibull growth curve model.
+
+
+
+```{r}
+
+# self starting Michaelis-menten model 
+data <- read.table("mm.txt", header = TRUE)
+attach(data)
+names(data)
+
+plot(rate ~ conc, pch = 16)
+
+model <- nls(rate ~ SSmicmen(conc, a, b)) 
+# a is the max value of rate, b is the value of conc at which half of the max response attained 
+summary(model)
+
+xv <- seq(0, 1.2, 0.01)
+yv <- predict(model, list(conc = xv))
+lines(xv, yv, col = "blue")
+detach(data)
+
+
+# self starting asymptotic exponential model 
+deer <- read.table("jaws.txt", header = TRUE)
+attach(deer)
+names(deer)
+
+model <- nls(bone ~ SSasymp(age, a, b, c))
+plot(age, bone, pch = 16)
+xv <- seq(0, 50, 0.2)
+yv <- predict(model, list(age =xv))
+lines(xv, yv)
+summary(model)
+
+detach(deer)
+
+
+
+# self starting logistic 
+sslogistic <- read.table("sslogistic.txt", header = TRUE)
+attach(sslogistic)
+
+names(sslogistic)
+
+plot(density ~ log(concentration), pch = 16, col = "green3")
+
+model <- nls(density ~ SSlogis(log(concentration), a, b, c))
+
+xv <- seq(-3, 3, 0.1)
+yv <- predict(model, list(concentration = exp(xv)))
+lines(xv, yv, col = "red")
+summary(model)
+detach(sslogistic)
+
+
+
+
+
+# four-parameter logistic 
+data <- read.table("chicks.txt", header = TRUE) 
+attach(data)
+names(data)
+
+model <- nls(weight ~ SSfpl(Time, a, b, c, d))
+xv <- seq(0, 22, 0.2)
+yv <- predict(model, list(Time = xv))
+plot(weight ~ Time, pch = 21, col = "red", bg = "green4")
+lines(xv, yv, col = "navy")
+summary(model)
+detach(data)
+
+
+
+# self start weibull growth function 
+weights <- read.table("weibull.growth.txt", header = TRUE) 
+attach(weights)
+names(weights)
+
+
+model <- nls(weight ~ SSweibull(time, Asym, Drop, lrc, pwr))
+summary(model)
+
+xt <- seq(2, 22, 0.1)
+yw <- predict(model, list(time = xt))
+plot(time, weight, pch = 21, col = "blue", bg = "orange")
+lines(xt, yw, col = "blue2")
+detach(weights)
+
+
+
+# self starting first order compartment function 
+foldat <- read.table("fol.txt", header = TRUE)
+attach(foldat)
+names(foldat)
+
+model <- nls(conc ~ SSfol(Dose, Time, a, b, c))
+summary(model)
+
+xv <- seq(0, 25, 0.1)
+yv <- predict(model, list(Time = xv))
+plot(conc ~ Time, pch = 21, col = "blue", bg = "red")
+lines(xv, yv, col = "green4")
+
+detach(foldat)
+``` 
+
+
+## Bootstrapping a family of non-linear regression 
+
+
+```{r}
+library(MASS)
+data(stormer)
+attach(stormer)
+
+model <- nls(Time ~ b * Viscosity/(Wt - c), start = list(b = 29, c = 2))
+summary(model)
+
+plot(Viscosity, Time, pch = 16, col = 1 + as.numeric(factor(Wt)))
+xv <- 0:300
+yv <- predict(model, list(Wt = 20, Viscosity = xv))
+lines(xv, yv, col = 2)
+yv <- predict(model, list(Wt = 50, Viscosity = xv))
+lines(xv, yv, col = 3)
+yv <- predict(model, list(Wt = 100, Viscosity = xv))
+lines(xv, yv, col = 4)
+
+
+# homemade function to do bootstrap 
+bv <- numeric(1000)
+cv <- numeric(1000)
+for(i in 1:1000){
+ss <- sample(1:23, replace = TRUE) 
+y <- Time[ss]
+x1 <- Viscosity[ss]
+x2 <- Wt[ss]
+model <- nls(y ~ b * x1/(x2 - c), start = list(b = 29, c = 2))
+bv[i] <- coef(model)[1]
+cv[i] <- coef(model)[2] 
+}
+
+quantile(bv, c(0.025, 0.975))
+
+quantile(cv, c(0.025, 0.975))
+
+
+
+
+# bootstrap by boot package 
+library(boot)
+
+rs <- resid(model)
+fit <- fitted(model)
+
+storm <- data.frame(fit, Viscosity, Wt)
+
+statistic <- function(rs, i){
+storm$y <- storm$fit + rs[i]
+coef(nls(y ~ b * Viscosity/(Wt - c), data = storm, start = coef(model)))
+}
+# note: some iterations may have singular gradient and thus error message, re-run the program in this case 
+boot.model <- boot(rs, statistic, R = 1000)
+boot.model
+
+boot.ci(boot.model,index=1)
+
+boot.ci(boot.model,index=2)
+
+detach(stormer)
+
+``` 
